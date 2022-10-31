@@ -1,0 +1,70 @@
+syntax = "proto3";
+package tutorial;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "./ProtoPackage";
+	
+message Member {
+  int32                     HeartbeatCounter = 1;
+  google.protobuf.Timestamp LastSeen = 2;
+  bool                      IsLeaving = 3;
+}
+
+enum MessageType {
+  MEMBERSHIP = 0;
+  JOIN_REQ = 1;
+  JOIN_REP = 2;
+  FILE_OP = 3;        // master request to non-master machine
+  CLIENT_REQUEST = 4; // client request to master
+  RETURN = 5;         // non-master to master or master to client
+  REPLICATION = 6;
+}
+
+enum FileOp {
+  GET = 0;
+  PUT = 1;
+  DELETE = 2;
+  LS = 3;
+}
+
+message MembershipMessage {
+  MessageType           Type = 1;
+  map<string, Member>   MemberList = 2;
+  string                MasterID = 3;
+  int32                 MasterCounter = 4;
+  map<string, FileInfo> FileMap = 5;
+}
+
+message FileInfo {
+  map<string, MachineFileInfo> MachineFileInfos = 1;
+}
+
+message MachineFileInfo {
+  int32                     Counter = 1;
+  google.protobuf.Timestamp LastSeen = 2;
+}
+
+/*
+		Option 1
+		master detecting failure
+		master sends message to machine 5 asking it to send get request
+		machine 5 receives and sends get request to master
+		master receives get request and operates on it as normal
+
+		Option 2
+		master detecting failure
+		master establishes connection with machine 1 and machine 5
+		master gets file from machine 1 and forwards to machine 5
+	*/
+
+message SdfsMessage {
+  MessageType Type = 1;
+  FileOp      FileOp = 2;        // get, put, delete, or ls
+  string      LocalFilename = 3; // arg to file op
+  string      SdfsFilename = 4;  // arg to file op
+  string      ClientIP = 5;      // used to keep track of which client sent the request (for when there are multiple reads at once)
+  string      ReturnString = 6;  // holds return value for put, delete, or ls (or error message)
+  int32       FileSeqNum = 7;
+  bytes       File = 8;          // arg to file op
+}

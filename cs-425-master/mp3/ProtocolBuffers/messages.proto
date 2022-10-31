@@ -1,0 +1,113 @@
+syntax = "proto3";
+package tutorial;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "./ProtoPackage";
+	
+message Member {
+  int32                     HeartbeatCounter = 1;
+  google.protobuf.Timestamp LastSeen = 2;
+  bool                      IsLeaving = 3;
+}
+
+enum MessageType {
+  MEMBERSHIP = 0;
+  JOIN_REQ = 1;
+  JOIN_REP = 2;
+  FILE_OP = 3;        // master request to non-master machine
+  CLIENT_REQUEST = 4; // client request to master
+  RETURN = 5;         // non-master to master or master to client
+  REPLICATION = 6;
+}
+
+enum FileOp {
+  GET = 0;
+  PUT = 1;
+  DELETE = 2;
+  LS = 3;
+}
+
+message MembershipMessage {
+  MessageType           Type = 1;
+  map<string, Member>   MemberList = 2;
+  string                MasterID = 3;
+  int32                 MasterCounter = 4;
+  map<string, FileInfo> FileMap = 5;
+}
+
+message FileInfo {
+  map<string, MachineFileInfo> MachineFileInfos = 1;
+}
+
+message MachineFileInfo {
+  int32                     Counter = 1;
+  google.protobuf.Timestamp LastSeen = 2;
+}
+
+message SdfsMessage {
+  MessageType Type = 1;
+  FileOp      FileOp = 2;        // get, put, delete, or ls
+  string      LocalFilename = 3; // arg to file op
+  string      SdfsFilename = 4;  // arg to file op
+  string      ClientIP = 5;      // used to keep track of which client sent the request (for when there are multiple reads at once)
+  string      ReturnString = 6;  // holds return value for put, delete, or ls (or error message)
+  int32       FileSeqNum = 7;
+  bool        ShouldAppend = 8;  // used for MapleJuice to always append to existing SDFS file
+  bytes       File = 9;          // arg to file op
+}
+
+
+/*
+- initiator to master
+- master to workers (assignment)
+- workers to master (on completion or failure)
+*/
+
+enum MapleJuicePhase {
+  INIT = 0;
+  ASSIGN = 1;
+  COMPLETE = 2;
+  FAIL = 3;
+}
+
+enum MapleJuiceType {
+  MAPLE = 0;
+  JUICE = 1;
+}
+
+enum Partition {
+  HASH = 0;
+  RANGE = 1;
+}
+
+/*
+maple <maple_exe> <num_maples>
+<sdfs_intermediate_filename_prefix> <sdfs_src_directory>
+
+Example:
+maple maple_exe 6 inter m
+
+juice <juice_exe> <num_juices>
+<sdfs_intermediate_filename_prefix> <sdfs_dest_filename>
+delete_input={0,1} partition_type={range,hash}
+
+Example:
+juice juice_exe 6 inter dest delete_input=0 partition_type=hash
+*/
+
+message MapleJuiceMessage {
+  MapleJuicePhase         Phase = 1;
+  MapleJuiceType          TaskType = 2;
+  int32                   NumWorkers = 3;
+  string                  ExeFilename = 4;
+  string                  IntermediatePrefix = 5;
+  string                  SrcDirectory = 6; // maple only
+  string                  DestFilename = 7; // juice only
+  bool                    DeleteInput = 8; // juice only
+  Partition               PartitionType = 9; // juice only
+  string                  MapleInputFile = 10; // maple only
+  repeated string         JuiceInputKeys = 11; // juice only
+  string                  MjGUID = 12;
+  bytes                   KeysToValues = 13;
+}
